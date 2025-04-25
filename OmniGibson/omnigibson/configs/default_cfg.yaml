@@ -1,0 +1,126 @@
+env: {}
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  # type: Scene
+  # type: InteractiveTraversableScene
+  # scene_model: Pomaria_0_garden
+  # scene_file: omnigibson/data/og_dataset/scenes/Pomaria_0_garden/json/Pomaria_0_garden_best.json
+  # floor_plane_visible: True
+  type: InteractiveTraversableScene
+  scene_model: Merom_1_int
+  scene_file: omnigibson/data/og_dataset/scenes/Merom_1_int/json/Merom_1_int_best.json
+  floor_plane_visible: True
+
+# [1.5, 7.6987, 0]  客厅中间
+# [-1.4, 7.6913, 0.73]  餐桌 breakfast_table_skczfi_0
+agents: 
+- type: FrankaAgent
+  name: franka
+  position: [-1.4, 7.6913, 0.73]
+  rotation: [1, 0, 0, 0]  # scalar-first
+  obs_modalities: [rgb, depth, proprio]
+  scale: 1.0
+  fixed_base: true
+  self_collision: false
+  action_normalize: true
+  action_type: continuous
+- type: AliengoAgent
+  name: aliengo
+  position: [1.7745543718338013, 7.816161632537842, 0.4]
+  rotation: [1, 0, 0, 0]  # scalar-first
+  obs_modalities: [rgb, depth, proprio]
+  scale: 1.0
+  fixed_base: true
+  self_collision: false
+  action_normalize: true
+  action_type: continuous
+- type: QuadrotorAgent
+  name: quadrotor
+  position: [2.7745543718338013, 1.2745543718338013, 0.05]
+  rotation: [1, 0, 0, 0]  # scalar-first
+  obs_modalities: [rgb, depth, proprio]
+  scale: 1.0
+  fixed_base: true
+  self_collision: false
+  action_normalize: true
+  action_type: continuous
+
+
+
+robots: []
+# - type: Fetch
+#   obs_modalities: [scan, rgb, depth]
+#   scale: 1.0
+#   self_collision: false
+#   action_normalize: true
+#   action_type: continuous
+#   grasping_mode: physical
+#   rigid_trunk: false
+#   default_trunk_offset: 0.365
+#   default_arm_pose: diagonal30
+#   reset_joint_pos: tuck
+#   controller_config:
+#     base:
+#       name: DifferentialDriveController
+#     arm_0:
+#       name: InverseKinematicsController
+#       kv: 2.0
+#     gripper_0:
+#       name: MultiFingerGripperController
+#       mode: binary
+#     camera:
+#       name: JointController
+#       use_delta_commands: False
+
+objects: # []  
+- type: DatasetObject
+  name: door_duymuw_1
+  usd_path: /home/uav/Desktop/1/door/door_cp.usda
+  category: door
+  model: duymuw
+  position: [1.7745543718338013, 2.3250746726989746, 1.1510995626449585]
+  orientation: [0.0, 0.0, 0.70710678, 0.70710678]
+  fixed_base: true
+  bounding_box: [0.1298, 0.6267, 1.9769]
+- type: DatasetObject
+  name: door_duymuw_2
+  usd_path: /home/uav/Desktop/1/door/door_cp.usda
+  category: door
+  model: duymuw
+  position: [0.6894515156745911, 2.3250746726989746, 1.1510995626449585]
+  orientation: [0.0, 0.0, 0.70710678, 0.70710678]
+  fixed_base: true
+  bounding_box: [0.1298, 0.6267, 1.9769]
+
+################################################################################################333333
+- type: DatasetObject
+  name: door_duymuw_1
+  category: door
+  model: duymuw
+  position: [1.7745543718338013, 2.3250746726989746, 1.1510995626449585]
+  orientation: [0.0, 0.0, 0.70710678, 0.70710678]
+  fixed_base: true
+  bounding_box: [0.1298, 0.6267, 1.9769]
+- type: DatasetObject
+  name: door_duymuw_2
+  category: door
+  model: duymuw
+  position: [0.6894515156745911, 2.3250746726989746, 1.1510995626449585]
+  orientation: [0.0, 0.0, 0.70710678, 0.70710678]
+  fixed_base: true
+  bounding_box: [0.1298, 0.6267, 1.9769]
+
+
+
+
+
+
+
+
+
+task:
+  type: DummyTask

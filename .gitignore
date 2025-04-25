@@ -1,0 +1,27 @@
+*.pyc
+__pycache__/
+*.pyc
+*.pyd
+*.pkl
+*.so
+*.egg-info/
+.DS_Store
+*.pth
+pw
+*.o
+*.ipynb
+*.ipynb_checkpoints/
+*.out
+npz/
+*.npy
+dev/transfer.c
+*.jpg
+*.bmp
+*.bak
+*.zip
+.*.swp
+
+docs/apidoc
+
+# vscode
+.vscode/
