@@ -400,10 +400,10 @@ class ArenaMP(object):
                       'task_goal': self.task_goal,
                       'goal_instruction': self.env.goal_instruction,
                       'step': steps,
-                      'subgoal': self.subgoal,
-                      'agent_id': id[0],
-                      'action': agent_action,
-                      'agent_message': agent_message,
+                      'subgoal': self.subgoal, # This is the Oracle's command message
+                      'agent_id': id, # Use the returned agent_id from step()
+                      'action': agent_action, # The actual action executed
+                      'agent_message': agent_message, # The message field from the agent's final feedback JSON
                       'satisfied': satisfied,
                       'unsatisfied': unsatisfied,
                       'env_graph': self.env.graph, 
@@ -436,9 +436,33 @@ class ArenaMP(object):
                                             --------------------------------
                                             ''')
                 break
-        saved_info[steps-1]['is_finished'] = success
-        
-        return success, steps, saved_info
+
+        end_time = time.time() # Record end time
+        total_duration = end_time - start_time
+        final_total_cost = self.total_cost + self.total_agent_cost
+
+        log_summary = f"""
+        ================ TASK SUMMARY ================
+        Task ID: {self.env.task_id}
+        Success: {success}
+        Total Steps: {final_steps} (GT Steps: {self.env.ground_truth_step_num})
+        Total Execution Time: {total_duration:.2f} seconds
+        Total Oracle API Cost: {self.total_cost:.6f}
+        Total Agent API Cost: {self.total_agent_cost:.6f}
+        Total Overall API Cost: {final_total_cost:.6f}
+        ============================================
+        """
+        print(log_summary)
+        self.write_log_to_file(log_summary)
+
+        # Update the last entry in saved_info with final metrics
+        if saved_info:
+            saved_info[-1]['is_finished'] = success
+            saved_info[-1]['cumulative_cost'] = final_total_cost
+            saved_info[-1]['execution_duration_seconds'] = total_duration
+
+
+        return success, final_steps, saved_info
 
     def update_dict(self,key, value, my_dict):
 

@@ -17,7 +17,17 @@ The history of my previous conversations with agents:
 #DIALOGUE_HISTORY#
 Pay attention to the dialogue history, because it records your conversations with different agents and the progress of the task execution. Depending on the content of the dialogue, the agent can avoid repeating the action that has been completed. And the content of the dialogue is conducive to the next step to make the instruction closer to the goal, improve the efficiency of the instruction, and avoid the inefficient execution of the task and the infinite loop.
 
-Note: The generated message should be accurate, helpful and brief. Do not generate repetitive messages. The specific format of the output should be: "Hello <class name>(id): #message#." And message can only be sent once with one agent at a time. "message" refers to the specific message content. The message should be in the form of a first person conversation. In addition to this format, you can also output your thoughts on completing the task and your reasons for giving the message. Try to include as much information as possible, but keep it as short as possible. Your thoughts and reasons must take full account of each agent's complete observation of its environment and the possible contribution of each agent's own capabilities to achieving the end goal. Please do not miss any agents.. Please think step by step.
+**Reasoning Output:**
+Before generating the command message, first provide your step-by-step reasoning. Explain:
+1.  **Agent Selection:** Why did you choose this specific agent for the next step?
+2.  **Action(s) Selection:** Why are these the most appropriate actions now?
+3.  **Goal Contribution:** How do these actions move towards the overall task goal (#TASK_GOAL#)?
+4.  **Alternatives Considered (Optional but helpful):** Briefly mention if other agents/actions were considered and why they were discarded.
+Ensure your reasoning considers all agent observations (#AGENT_OBSERVATIONS#), agent capabilities, and the dialogue history (#DIALOGUE_HISTORY#). Keep the reasoning concise and clear.
+
+**Command Message Output:**
+After providing your reasoning, generate the command message.
+Note: The generated command message should be accurate, helpful and brief. Do not generate repetitive messages. The specific format of the output MUST be: "Hello <class name>(id): #message#." And message can only be sent once with one agent at a time. "message" refers to the specific message content. The message should be in the form of a first person conversation. 
 
 Note: The message sent to the agent should contain the actions that should be performed in the next step or two, but not more than three steps, depending on the continuity of the actions. For example, movetowards the door, and then open the door, this is a coherent operation. And at least the first step needs to be an action that the agent receiving the message can perform.
 
