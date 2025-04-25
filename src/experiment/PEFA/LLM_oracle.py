@@ -247,64 +247,141 @@ class ArenaMP(object):
             elif class_name == 'robot arm' or class_name == 'robot_arm':
                 prompt_path = self.robot_arm_prompt_path
 
-            chat_agent_info = {"class_name": class_name, 
-                            "id": real_id, 
-                            "observation": agent_obs, 
-                            "instruction": message, 
+            chat_agent_info = {"class_name": class_name,
+                            "id": real_id,
+                            "observation": agent_obs,
+                            "instruction": message,
                             "prompt_path": prompt_path
                             }
 
-            agent_action, agent_message, agent_info = self.get_actions(obs,  chat_agent_info)
-            # agent_action = '[movetowards] <coffeetable> (12)'
-            # agent_message = 'YES I CAN. \n\nThe first step to accomplish the task is to move towards the coffeetable. This action is available in the list of actions I can perform. After moving to the coffeetable, I can use my robotic arm to pick up the apple. \n\nTherefore, the best available action to achieve the goal as soon as possible is to [movetowards] <coffeetable> (12). The action I finally decided to perform is [movetowards] <coffeetable> (12).'
-            self.write_log_to_file(str(agent_info["LLM"]["action_list"]))
+            feedback_json = None # Initialize feedback_json
+            agent_action, feedback_json = self.get_actions(obs, chat_agent_info) # Get action and feedback dict
 
-            self.write_log_to_file(f"<{class_name}>({real_id}): " + str(agent_message))
-            
-            self.costdict =  self.update_dict(f"<{class_name}>({real_id})", agent_info["LLM"]["cost"], self.costdict)
-            self.write_log_to_file(f"COST1:{self.total_cost}!!!!!")
-            self.write_log_to_file(str(self.costdict))
-            self.write_log_to_file(f"COST2:{sum(self.costdict.values())}!!!!!")
-            self.write_log_to_file(f'总的花费：{self.total_cost + sum(self.costdict.values())}')
+            # Extract message for logging/history, handle potential None feedback_json if get_actions failed internally (should not happen with new logic)
+            agent_log_message = feedback_json.get('message', 'Error: Could not retrieve feedback message.') if feedback_json else 'Error: feedback_json is None.'
+            # Log the message part of the feedback
+            self.write_log_to_file(f"<{class_name}>({real_id}) - Planned Action: {agent_action}")
+            self.write_log_to_file(f"<{class_name}>({real_id}) - Feedback Message: {agent_log_message}")
+            if self.debug:
+                 self.write_log_to_file(f"<{class_name}>({real_id}) - Full Feedback JSON (Initial): {json.dumps(feedback_json, indent=2)}")
+
+
+            # --- Cost calculation (Assuming agent_info is no longer returned or needed here) ---
+            # self.costdict =  self.update_dict(f"<{class_name}>({real_id})", agent_info["LLM"]["cost"], self.costdict) # Needs update if cost info source changes
+            # self.write_log_to_file(f"COST1:{self.total_cost}!!!!!") # Assuming total_cost is updated elsewhere (e.g., in self.generator)
+            # self.write_log_to_file(str(self.costdict))
+            # self.write_log_to_file(f"COST2:{sum(self.costdict.values())}!!!!!")
+            # self.write_log_to_file(f'Total Cost (Placeholder): {self.total_cost + sum(self.costdict.values())}') # Placeholder, cost calculation might need rework
             self.write_log_to_file('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ')
 
-            self.total_dialogue_history.append(f"<{class_name}>({real_id}): " + str(agent_message))
-            numbered_list = [f"[{i+1}]、{item}" for i, item in enumerate(self.total_dialogue_history)]
-            self.dialogue_history = '\n'.join(numbered_list[-10:])
+
+            # --- Update dialogue history with the structured feedback ---
+            current_feedback_entry = f"<{class_name}>({real_id}):\n{json.dumps(feedback_json, indent=2)}" if feedback_json else f"<{class_name}>({real_id}): [Error processing feedback]"
+            self.total_dialogue_history.append(current_feedback_entry) # Append initial feedback (status will be updated after execution)
+            # Note: dialogue_history used in the prompt will be updated later, after execution status is known
+
         except Exception as e:
-    
-            print(f"An error occurred: {e}")
+            # This exception handles errors *before* calling env.step (e.g., parsing Oracle message, calling get_actions)
+            print(f"An error occurred before action execution: {e}")
             traceback.print_exc()
             error_info = traceback.format_exc()
-            self.write_log_to_file(f"An error occurred: {e}")
-            self.write_log_to_file(error_info+'\n\n')
-            agent_action = None
-            agent_message = "all robot agents: In the last step, the oracle's reasoning was incorrect, and no instructions were given to any of the robot agents, therefore none of the robot agents performed any actions. Please reassess the information in the environment and give a correct instruction strictly following the template 'Hello <class name>(id): #message#.'"
-            self.total_dialogue_history.append(agent_message)
-            numbered_list = [f"[{i+1}]、{item}" for i, item in enumerate(self.total_dialogue_history)]
-            self.dialogue_history = '\n'.join(numbered_list[-10:])
-      
-        
+            self.write_log_to_file(f"An error occurred before action execution: {e}")
+            self.write_log_to_file(error_info + '\n\n')
+            agent_action = None # No action planned due to error
+            # Create an error feedback JSON to record in history
+            feedback_json = {
+                "status": "error_oracle_phase",
+                "message": f"Oracle phase error before execution: {e}. Traceback: {error_info}",
+                "failure_reason_code": "ORACLE_PRE_EXECUTION_ERROR",
+                "action_attempted": None,
+                "key_observations": None,
+                "metrics": None
+            }
+            # Don't update total_dialogue_history here, let the post-action logic handle it
+
+
+        # --- Execute Action and Update Feedback ---
+        execution_successful = False # Flag to track if env.step succeeded
         if agent_action is None:
+            # Handle case where no action was planned (either LLM decided so, or error occurred)
+            print("No action to execute.")
+            # Use the feedback_json generated above (either from agent or error handling)
+            # Ensure status reflects why no action was taken if feedback_json isn't already an error status
+            if feedback_json and feedback_json.get('status') not in ['error_llm_parse', 'error_oracle_phase']:
+                 feedback_json['status'] = 'no_action_planned' # Or keep agent's original status if it explained why (e.g., already done)
+
+            # Need to maintain state consistency from the previous step
             done = self.last_done
             task_results = self.last_task_results
             satisfied = self.last_satisfied
             unsatisfied = self.last_unsatisfied
-            self.env.steps += 1
+            # Increment step count manually if no action is taken? Original code did this.
+            self.env.steps += 1 # Keep consistency with original logic
         else:
+            # Execute the planned action
             try:
-                done, task_results,satisfied, unsatisfied,steps= self.env.step(class_name, real_id, agent_action, self.task_goal)
+                done, task_results, satisfied, unsatisfied, steps = self.env.step(class_name, real_id, agent_action, self.task_goal)
                 self.last_done = done
                 self.last_task_results = task_results
                 self.last_satisfied = satisfied
                 self.last_unsatisfied = unsatisfied
-                
+                execution_successful = True
+
+                # Update feedback_json status based on execution outcome
+                if feedback_json: # Should always exist unless primary try block failed catastrophically
+                    if done and task_results: # Assuming task_results=True means success
+                        feedback_json['status'] = 'success' # Overall task success
+                    elif feedback_json.get('status') != 'failure': # If agent didn't already report failure
+                         feedback_json['status'] = 'partial_success' # Step executed, task not done
+
             except Exception as e:
-                print("Exception occurs when performing action: ", agent_action)
-                raise Exception
-        self.write_log_to_file(f'\nDIALOGUE_HISTORY:\n{self.dialogue_history}')  
+                print(f"Exception occurred when performing action: {agent_action}, Error: {e}")
+                traceback.print_exc()
+                error_info = traceback.format_exc()
+                # Update feedback_json to reflect execution error
+                if feedback_json:
+                    feedback_json['status'] = 'error_execution'
+                    feedback_json['failure_reason_code'] = 'EXECUTION_EXCEPTION'
+                    # Append execution error details to the message
+                    original_message = feedback_json.get('message', '')
+                    feedback_json['message'] = f"{original_message}\n\nEXECUTION FAILED: {e}\n{error_info}"
+                else: # Should not happen, but as a fallback
+                     feedback_json = {
+                        "status": "error_execution",
+                        "message": f"Action execution failed: {e}. Traceback: {error_info}",
+                        "failure_reason_code": "EXECUTION_EXCEPTION",
+                        "action_attempted": agent_action,
+                        "key_observations": None,
+                        "metrics": None
+                    }
+                # Need to maintain state from last successful step
+                done = self.last_done
+                task_results = self.last_task_results
+                satisfied = self.last_satisfied
+                unsatisfied = self.last_unsatisfied
+
+        # --- Finalize Dialogue History for next step ---
+        # Update the last entry in total_dialogue_history with the potentially modified feedback_json
+        final_feedback_entry = f"<{class_name}>({real_id}):\n{json.dumps(feedback_json, indent=2)}" if feedback_json else f"<{class_name}>({real_id}): [Error processing final feedback]"
+        if self.total_dialogue_history: #
+             self.total_dialogue_history[-1] = final_feedback_entry # Replace the initial entry with the final one including execution status
+        else: # Should not happen based on code flow, but safeguard
+             self.total_dialogue_history.append(final_feedback_entry)
+
+
+        # Update the dialogue history snippet for the next prompt
+        numbered_list = [f"[{i + 1}]、{item}" for i, item in enumerate(self.total_dialogue_history)]
+        self.dialogue_history = '\n'.join(numbered_list[-10:]) # Use the updated history
+
+        self.write_log_to_file(f'\nFINAL DIALOGUE_HISTORY SNIPPET (for next prompt):\n{self.dialogue_history}')
         steps = self.env.steps
-        return done, task_results, satisfied, unsatisfied, id, agent_action, agent_message,steps
+
+        # The agent_message returned might be less useful now, maybe return the final feedback_json instead?
+        # Keeping original return signature for now to minimize downstream changes, but agent_message is just the parsed LLM message.
+        # Returning final 'feedback_json' itself might be better long-term.
+        final_llm_message = feedback_json.get('message', '') if feedback_json else '[Error retrieving final message]'
+
+        return done, task_results, satisfied, unsatisfied, id[0] if 'id' in locals() and id else None, agent_action, final_llm_message, steps # Return agent_id correctly
 
 
     def run(self):

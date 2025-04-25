@@ -1,6 +1,7 @@
 from LLM import *
 import re
 import copy
+import json # Added import
 
 
 class LLM_agent:
@@ -144,12 +145,55 @@ class LLM_agent:
 						},
 				}
 
-		message, a_info = self.LLM_plan()
-		if a_info['plan'] is None: 
-			print("No more things to do!")
-		plan = a_info['plan']
-		a_info.update({"steps": self.steps})
-		info.update({"LLM": a_info})
+		raw_llm_output, a_info = self.LLM_plan() # Renamed message to raw_llm_output for clarity
 
-		return plan, message, info
+		# --- Start: Parse LLM JSON output ---
+		feedback_json = None
+		plan = None
+		llm_message = "" # Default message if parsing fails
 
+		try:
+			# Attempt to parse the raw output as JSON
+			feedback_json = json.loads(raw_llm_output)
+			# Extract planned action and reasoning message
+			plan = feedback_json.get('action_attempted')
+			llm_message = feedback_json.get('message', raw_llm_output) # Use raw output as fallback message
+			
+			# Basic validation (check if required fields exist, though schema is stricter)
+			if not isinstance(feedback_json, dict) or 'action_attempted' not in feedback_json or 'message' not in feedback_json:
+				print(f"WARNING: LLM JSON output missing required fields. Raw: {raw_llm_output}")
+				raise json.JSONDecodeError("Required JSON fields missing", raw_llm_output, 0)
+
+		except json.JSONDecodeError as e:
+			print(f"ERROR: Failed to parse LLM output as JSON: {e}")
+			print(f"LLM Raw Output was: {raw_llm_output}")
+			# Create a fallback error JSON object
+			feedback_json = {
+				"status": "error_llm_parse",
+				"message": f"LLM output was not valid JSON. Error: {e}. Raw output: {raw_llm_output}",
+				"failure_reason_code": "LLM_OUTPUT_UNPARSEABLE",
+				"action_attempted": None,
+				"key_observations": None,
+				"metrics": None
+			}
+			plan = None # No valid plan if JSON parsing failed
+			llm_message = feedback_json["message"]
+
+		if plan is None and feedback_json.get("status") != "error_llm_parse": # Check if LLM genuinely planned nothing
+			print("LLM explicitly planned no action (action_attempted is null or empty).")
+			# Ensure feedback_json reflects no action was planned if it wasn't an error
+			if feedback_json:
+				feedback_json['action_attempted'] = None
+
+
+		# --- End: Parse LLM JSON output ---
+
+		# Prepare the old 'info' dict potentially for logging or debugging, but it's less critical now
+		a_info.update({"steps": self.steps}) # Keep step count
+		info.update({"LLM_raw_output": raw_llm_output, "LLM_parsed_message": llm_message, "LLM_a_info": a_info}) # Store raw/parsed info
+
+		# Return the planned action and the full parsed feedback JSON object
+		# The orchestrator (LLM_oracle.py) will execute 'plan' and then fill the
+		# execution-related fields ('status', 'key_observations', etc.) in 'feedback_json'
+		# before saving it to history.
+		return plan, feedback_json # Return plan and the JSON object

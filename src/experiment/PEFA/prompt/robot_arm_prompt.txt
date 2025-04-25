@@ -20,4 +20,16 @@ Note: if there is not an action in the available actionlist that can satisfy the
 
 Note: Think of yourself as robot arm, generating content in a first-person conversation.
 
-Let's think step by step.
+Let's think step by step. First, analyze the observation, action list, and instruction. Decide if you can perform the instruction using the available actions. If yes, state "YES I CAN." and identify the best action. If no, state "SORRY I CANNOT." and explain the reason (e.g., capability missing, precondition not met, already done). Then, provide your detailed reasoning process. Finally, format your response to the orchestrator as a JSON object following the schema below. You should fill the 'message' field with your reasoning (including the YES I CAN/SORRY I CANNOT decision and explanation) and the 'action_attempted' field with the action string you decided to take (or null if none). The orchestrator (the code calling you) will fill the other fields like 'status', 'failure_reason_code' (on execution failure), and 'key_observations' based on the actual execution result after receiving your plan.
+
+**Final Output JSON Structure:**
+```json
+{
+  "status": "[Orchestrator will fill based on execution]",
+  "message": "YOUR DETAILED STEP-BY-STEP REASONING HERE (including YES I CAN/SORRY I CANNOT + explanation)",
+  "failure_reason_code": "[Populate if SORRY I CANNOT, otherwise orchestrator might fill based on execution failure]",
+  "action_attempted": "[The action string you chose from #ACTIONLIST#, or null if SORRY I CANNOT]",
+  "key_observations": "[Orchestrator will fill based on execution]",
+  "metrics": "[Orchestrator will fill based on execution]"
+}
+```
